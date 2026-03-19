@@ -1,0 +1,37 @@
+[
+  {
+    "name": "Sézane",
+    "email": "contact@sezane.com",
+    "website": "https://www.sezane.com",
+    "description": "Marque de mode française éco-responsable, vêtements féminins chic",
+    "instagram": "@sezane"
+  },
+  {
+    "name": "Asphalte",
+    "email": "bonjour@asphalte.com",
+    "website": "https://www.asphalte.com",
+    "description": "Marque de mode masculine durable et intemporelle",
+    "instagram": "@asphalte_paris"
+  },
+  {
+    "name": "Jimmy Fairly",
+    "email": "hello@jimmyfairly.com",
+    "website": "https://www.jimmyfairly.com",
+    "description": "Lunettes de vue et solaires lifestyle, mode accessible",
+    "instagram": "@jimmyfairly"
+  },
+  {
+    "name": "Moodjo",
+    "email": "hello@moodjo.com",
+    "website": "https://www.moodjo.com",
+    "description": "Bien-être, accessoires lifestyle et méditation",
+    "instagram": "@moodjo"
+  },
+  {
+    "name": "Aime Skincare",
+    "email": "contact@aimeskincare.com",
+    "website": "https://www.aimeskincare.com",
+    "description": "Compléments alimentaires et cosmétiques naturels pour la peau",
+    "instagram": "@aimeskincare"
+  }
+]
