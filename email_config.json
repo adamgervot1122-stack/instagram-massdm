@@ -1,0 +1,23 @@
+{
+    "sender": {
+        "name": "Ton Prénom Nom",
+        "email": "ton.email@gmail.com",
+        "smtp_host": "smtp.gmail.com",
+        "smtp_port": 587,
+        "smtp_password": "TON_MOT_DE_PASSE_APP_GMAIL"
+    },
+    "campaign": {
+        "subject": "Collaboration avec {name} - Proposition de partenariat",
+        "delay_between_emails_seconds": 30,
+        "daily_limit": 50,
+        "your_instagram": "@ton_compte",
+        "your_niche": "lifestyle / fitness",
+        "your_followers": "15K",
+        "your_name": "Ton Prénom"
+    },
+    "template": {
+        "use_ai_personalization": false,
+        "anthropic_api_key": "sk-ant-VOTRE_CLE_API",
+        "ai_personalization_note": "Mettre use_ai_personalization à true pour personnaliser chaque email avec Claude (coûte des crédits). false = template fixe ultra rapide et gratuit."
+    }
+}
