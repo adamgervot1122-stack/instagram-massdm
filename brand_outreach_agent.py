@@ -1,12 +1,12 @@
 """
 Agent IA de prospection de marques lifestyle par email.
-Utilise Claude pour rechercher des marques, générer des emails personnalisés et les envoyer.
+Utilise Gemini (gratuit) pour générer des emails personnalisés et les envoyer.
 """
 
 import os
 import json
 import smtplib
-import anthropic
+import google.generativeai as genai
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from dataclasses import dataclass
@@ -17,10 +17,10 @@ from typing import Optional
 
 @dataclass
 class Config:
-    # Claude
-    anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "")
+    # Gemini (gratuit)
+    gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
 
-    # Ton profil (à remplir)
+    # Ton profil (à remplir dans le .env)
     your_name: str = os.getenv("YOUR_NAME", "Ton Prénom")
     your_instagram: str = os.getenv("YOUR_INSTAGRAM", "@toncompte")
     your_niche: str = os.getenv("YOUR_NICHE", "lifestyle / mode / bien-être")
@@ -50,7 +50,8 @@ class Brand:
 class BrandOutreachAgent:
     def __init__(self, config: Config):
         self.config = config
-        self.client = anthropic.Anthropic(api_key=config.anthropic_api_key)
+        genai.configure(api_key=config.gemini_api_key)
+        self.model = genai.GenerativeModel("gemini-1.5-flash")
 
     def generate_email(self, brand: Brand) -> dict:
         """Génère un email de prospection personnalisé pour une marque lifestyle."""
@@ -87,18 +88,10 @@ Réponds UNIQUEMENT en JSON avec ce format exact :
   "body": "Corps complet de l'email en texte avec des sauts de ligne \\n"
 }}"""
 
-        response = self.client.messages.create(
-            model="claude-opus-4-6",
-            max_tokens=1024,
-            thinking={"type": "adaptive"},
-            messages=[{"role": "user", "content": prompt}]
-        )
-
-        # Extraire le JSON de la réponse
-        text = next(b.text for b in response.content if b.type == "text")
+        response = self.model.generate_content(prompt)
+        text = response.text.strip()
 
         # Nettoyer si le modèle ajoute des balises markdown
-        text = text.strip()
         if text.startswith("```"):
             text = text.split("```")[1]
             if text.startswith("json"):
@@ -120,7 +113,7 @@ Réponds UNIQUEMENT en JSON avec ce format exact :
             return True
 
         if not self.config.smtp_user or not self.config.smtp_password:
-            print(f"[ERREUR] SMTP non configuré. Ajoute SMTP_USER et SMTP_PASSWORD.")
+            print(f"[ERREUR] SMTP non configuré. Ajoute SMTP_USER et SMTP_PASSWORD dans le .env")
             return False
 
         msg = MIMEMultipart("alternative")
@@ -142,12 +135,12 @@ Réponds UNIQUEMENT en JSON avec ce format exact :
             print(f"[ERREUR] Envoi échoué pour {brand.name}: {e}")
             return False
 
-    def prospect_brands(self, brands: list[Brand], dry_run: bool = True) -> dict:
+    def prospect_brands(self, brands: list, dry_run: bool = True) -> dict:
         """Lance la prospection complète sur une liste de marques."""
 
         results = {"sent": [], "failed": [], "total": len(brands)}
 
-        print(f"\n🚀 Démarrage de la prospection — {len(brands)} marque(s)")
+        print(f"\n Démarrage de la prospection — {len(brands)} marque(s)")
         print(f"Mode : {'DRY RUN (simulation)' if dry_run else 'ENVOI RÉEL'}\n")
 
         for i, brand in enumerate(brands, 1):
@@ -169,17 +162,19 @@ Réponds UNIQUEMENT en JSON avec ce format exact :
                 print(f"[ERREUR] {brand.name}: {e}")
                 results["failed"].append(brand.name)
 
-        print(f"\n📊 Résultats : {len(results['sent'])} envoyé(s), {len(results['failed'])} échoué(s)")
+        print(f"\nRésultats : {len(results['sent'])} envoyé(s), {len(results['failed'])} échoué(s)")
         return results
 
 
 # ─── Exemple d'utilisation ────────────────────────────────────────────────────
 
 def main():
+    from dotenv import load_dotenv
+    load_dotenv()
+
     config = Config()
 
     # Liste de marques lifestyle à prospecter
-    # Remplis avec les vraies adresses email des marques
     brands = [
         Brand(
             name="Sézane",
