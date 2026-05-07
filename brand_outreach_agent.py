@@ -1,11 +1,14 @@
 """
 Agent IA de prospection de marques lifestyle par email.
 Utilise Gemini (gratuit) pour générer des emails personnalisés et les envoyer.
+Utilise Google Places API (New) pour trouver automatiquement des boutiques/marques.
 """
 
 import os
 import json
 import smtplib
+import time
+import requests
 import google.generativeai as genai
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -27,6 +30,9 @@ class Config:
     your_followers: str = os.getenv("YOUR_FOLLOWERS", "10K")
     your_email: str = os.getenv("YOUR_EMAIL", "")
 
+    # Google Places API
+    google_places_api_key: str = os.getenv("GOOGLE_PLACES_API_KEY", "")
+
     # SMTP (Gmail recommandé)
     smtp_host: str = os.getenv("SMTP_HOST", "smtp.gmail.com")
     smtp_port: int = int(os.getenv("SMTP_PORT", "587"))
@@ -43,6 +49,77 @@ class Brand:
     website: str = ""
     description: str = ""
     instagram: str = ""
+
+
+# ─── Google Places Finder ────────────────────────────────────────────────────
+
+class PlacesFinder:
+    """Trouve automatiquement des boutiques/marques via Google Places API (New)."""
+
+    PLACES_URL = "https://places.googleapis.com/v1/places:searchText"
+
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+
+    def search(self, query: str, max_results: int = 10) -> list:
+        """
+        Recherche des lieux/boutiques correspondant à la requête.
+        Retourne une liste de Brand prête à prospecter.
+        """
+        if not self.api_key:
+            print("[ERREUR] GOOGLE_PLACES_API_KEY manquante dans le .env")
+            return []
+
+        headers = {
+            "Content-Type": "application/json",
+            "X-Goog-Api-Key": self.api_key,
+            "X-Goog-FieldMask": "places.displayName,places.websiteUri,places.formattedAddress,places.types,places.internationalPhoneNumber"
+        }
+        payload = {
+            "textQuery": query,
+            "pageSize": max_results,
+            "languageCode": "fr"
+        }
+
+        try:
+            response = requests.post(self.PLACES_URL, headers=headers, json=payload, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+        except Exception as e:
+            print(f"[ERREUR] Google Places API : {e}")
+            return []
+
+        brands = []
+        for place in data.get("places", []):
+            name = place.get("displayName", {}).get("text", "")
+            website = place.get("websiteUri", "")
+            address = place.get("formattedAddress", "")
+            types = place.get("types", [])
+
+            # Génère un email de contact probable depuis le site web
+            email = self._guess_email(website)
+
+            brand = Brand(
+                name=name,
+                email=email,
+                website=website,
+                description=f"{', '.join(types[:2])} — {address}",
+                instagram=""
+            )
+            brands.append(brand)
+            print(f"[Places] Trouvé : {name} | {website} | email estimé : {email}")
+
+        return brands
+
+    def _guess_email(self, website: str) -> str:
+        """Génère une adresse email probable depuis le domaine du site."""
+        if not website:
+            return ""
+        try:
+            domain = website.replace("https://", "").replace("http://", "").split("/")[0]
+            return f"contact@{domain}"
+        except Exception:
+            return ""
 
 
 # ─── Agent IA ────────────────────────────────────────────────────────────────
@@ -173,33 +250,48 @@ def main():
     load_dotenv()
 
     config = Config()
-
-    # Liste de marques lifestyle à prospecter
-    brands = [
-        Brand(
-            name="Sézane",
-            email="contact@sezane.com",
-            website="https://www.sezane.com",
-            description="Marque de mode française éco-responsable, vêtements féminins chic",
-            instagram="@sezane"
-        ),
-        Brand(
-            name="Asphalte",
-            email="bonjour@asphalte.com",
-            website="https://www.asphalte.com",
-            description="Marque de mode masculine durable et intemporelle",
-            instagram="@asphalte_paris"
-        ),
-        Brand(
-            name="Moodjo",
-            email="hello@moodjo.com",
-            website="https://www.moodjo.com",
-            description="Marque lifestyle bien-être et accessoires de méditation",
-            instagram="@moodjo"
-        ),
-    ]
-
     agent = BrandOutreachAgent(config)
+
+    # ── Option 1 : Recherche automatique via Google Places ──────────────────
+    # Décommente et modifie la recherche selon ta niche
+    # Exemples : "boutique streetwear Paris", "label house music France",
+    #            "marque skincare naturelle", "boutique lifestyle Lyon"
+
+    USE_PLACES = bool(config.google_places_api_key)
+
+    if USE_PLACES:
+        finder = PlacesFinder(config.google_places_api_key)
+        print("[Places] Recherche automatique de boutiques...")
+        brands = finder.search("boutique lifestyle mode Paris", max_results=10)
+    else:
+        # ── Option 2 : Liste manuelle ────────────────────────────────────────
+        brands = [
+            Brand(
+                name="Sézane",
+                email="contact@sezane.com",
+                website="https://www.sezane.com",
+                description="Marque de mode française éco-responsable, vêtements féminins chic",
+                instagram="@sezane"
+            ),
+            Brand(
+                name="Asphalte",
+                email="bonjour@asphalte.com",
+                website="https://www.asphalte.com",
+                description="Marque de mode masculine durable et intemporelle",
+                instagram="@asphalte_paris"
+            ),
+            Brand(
+                name="Moodjo",
+                email="hello@moodjo.com",
+                website="https://www.moodjo.com",
+                description="Marque lifestyle bien-être et accessoires de méditation",
+                instagram="@moodjo"
+            ),
+        ]
+
+    if not brands:
+        print("[INFO] Aucune marque trouvée. Vérifie ta clé API ou ta liste manuelle.")
+        return
 
     # dry_run=True = simulation (affiche sans envoyer)
     # dry_run=False = envoi réel (nécessite SMTP configuré)
