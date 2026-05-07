@@ -1,0 +1,221 @@
+// OPPORTUNITY OS — database schema
+// Postgres / Supabase. Run: pnpm prisma migrate dev
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────────────────────────────────────
+// Tenancy
+// ───────────────────────────────────────────
+
+model Workspace {
+  id            String          @id @default(uuid())
+  name          String
+  plan          Plan            @default(FREE)
+  createdAt     DateTime        @default(now())
+  members       Member[]
+  opportunities Opportunity[]
+  agentRuns     AgentRun[]
+  pipelines     PipelineRun[]
+  signals       Signal[]
+}
+
+enum Plan {
+  FREE
+  PRO
+  SCALE
+  ENTERPRISE
+}
+
+model Member {
+  id          String     @id @default(uuid())
+  workspaceId String
+  workspace   Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  email       String
+  role        Role       @default(MEMBER)
+  createdAt   DateTime   @default(now())
+
+  @@unique([workspaceId, email])
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+// ───────────────────────────────────────────
+// Core domain
+// ───────────────────────────────────────────
+
+model Opportunity {
+  id            String      @id @default(uuid())
+  workspaceId   String
+  workspace     Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  niche         String
+  geos          String[]    // ISO-3166 alpha-2
+  periodDays    Int         @default(90)
+
+  score         Int?        // 0-100
+  verdict       Verdict?
+  subscores     Json?       // { demand:8, competition:6, ... }
+  geoRanking    Json?       // [{country, score, tier, ...}]
+
+  offer         Json?
+  landingHtml   String?
+  ppc           Json?
+  content       Json?
+
+  status        OpportunityStatus @default(DRAFT)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  pipelineRuns  PipelineRun[]
+  agentRuns     AgentRun[]
+  signals       Signal[]
+
+  @@index([workspaceId, score])
+  @@index([workspaceId, niche])
+}
+
+enum Verdict {
+  GO
+  GO_WITH_RESERVES
+  NO_GO_NOW
+  NO_GO
+}
+
+enum OpportunityStatus {
+  DRAFT
+  RUNNING
+  READY
+  PARTIAL
+  FAILED
+}
+
+// ───────────────────────────────────────────
+// Pipeline + agent telemetry
+// ───────────────────────────────────────────
+
+model PipelineRun {
+  id             String       @id @default(uuid())
+  workspaceId    String
+  workspace      Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  opportunityId  String?
+  opportunity    Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+
+  status         RunStatus    @default(QUEUED)
+  startedAt      DateTime?
+  finishedAt     DateTime?
+  costUsd        Decimal?     @db.Decimal(10, 4)
+  trigger        Trigger      @default(MANUAL)
+  errorMessage   String?
+
+  agentRuns      AgentRun[]
+
+  createdAt      DateTime     @default(now())
+
+  @@index([workspaceId, createdAt])
+}
+
+enum Trigger {
+  MANUAL
+  CRON
+  WEBHOOK
+}
+
+enum RunStatus {
+  QUEUED
+  RUNNING
+  SUCCESS
+  PARTIAL
+  FAILED
+  CANCELLED
+}
+
+model AgentRun {
+  id             String       @id @default(uuid())
+  workspaceId    String
+  workspace      Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  pipelineRunId  String?
+  pipelineRun    PipelineRun? @relation(fields: [pipelineRunId], references: [id], onDelete: SetNull)
+  opportunityId  String?
+  opportunity    Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+
+  agent          AgentName
+  status         RunStatus    @default(QUEUED)
+  input          Json
+  output         Json?
+  promptHash     String       // for cache lookup
+  cacheHit       Boolean      @default(false)
+
+  model          String?
+  costUsd        Decimal?     @db.Decimal(10, 4)
+  inputTokens    Int?
+  outputTokens   Int?
+  latencyMs      Int?
+  citations      Json?
+  errorMessage   String?
+
+  createdAt      DateTime     @default(now())
+  finishedAt     DateTime?
+
+  @@index([workspaceId, agent, createdAt])
+  @@index([promptHash])
+}
+
+enum AgentName {
+  trend_hunter
+  seo_hunter
+  reddit_pain
+  social_viral
+  competitor
+  offer_generator
+  landing_page
+  ppc
+  content_engine
+  market_score
+}
+
+// ───────────────────────────────────────────
+// Raw signals (cache + provenance)
+// ───────────────────────────────────────────
+
+model Signal {
+  id            String       @id @default(uuid())
+  workspaceId   String
+  workspace     Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  opportunityId String?
+  opportunity   Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+
+  source        SignalSource
+  url           String?
+  payload       Json
+  fetchedAt     DateTime     @default(now())
+  expiresAt     DateTime?
+
+  @@index([workspaceId, source, fetchedAt])
+}
+
+enum SignalSource {
+  GOOGLE_TRENDS
+  SEMRUSH
+  UBERSUGGEST
+  DATAFORSEO
+  AHREFS
+  REDDIT
+  TIKTOK
+  INSTAGRAM
+  YOUTUBE
+  META_ADS_LIBRARY
+  AMAZON
+  SIMILARWEB
+  MANUAL
+}
