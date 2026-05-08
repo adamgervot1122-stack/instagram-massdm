@@ -133,31 +133,45 @@ class BrandOutreachAgent:
     def generate_email(self, brand: Brand) -> dict:
         """Génère un email de prospection personnalisé pour une marque lifestyle."""
 
-        prompt = f"""Tu es un expert en marketing d'influence et en prospection de marques lifestyle.
+        prompt = f"""Tu es un expert en prospection commerciale et personal branding.
 
-Génère un email de prospection professionnel, chaleureux et personnalisé pour contacter cette marque.
+Génère un email de prospection en suivant EXACTEMENT ce style et cette structure :
 
-**Profil de l'influenceur/créateur :**
+--- EXEMPLE DE STYLE À RESPECTER ---
+Bonjour [Nom] 👋🏼
+
+J'espère que vous allez bien !?
+
+[Compliment sincère et précis sur ce qui inspire dans leur marque/activité — communication, ambiance, clientèle, valeurs...]
+
+Je voulais savoir si vous cherchez des [type de collaboration] pour vous amener un maximum de [bénéfice concret] selon votre accord ?!
+
+Merci d'avance !
+À bientôt !
+
+[Prénom]
+--- FIN DE L'EXEMPLE ---
+
+**Profil de l'expéditeur :**
 - Nom : {self.config.your_name}
 - Instagram : {self.config.your_instagram}
 - Niche : {self.config.your_niche}
 - Audience : {self.config.your_followers} abonnés
 - Email : {self.config.your_email}
 
-**Marque à contacter :**
+**Entreprise à contacter :**
 - Nom : {brand.name}
 - Site web : {brand.website or "non renseigné"}
-- Description : {brand.description or "marque lifestyle"}
+- Description : {brand.description or "entreprise lifestyle"}
 - Instagram : {brand.instagram or "non renseigné"}
 
-**Instructions pour l'email :**
-1. Objet accrocheur et professionnel (max 60 caractères)
-2. Introduction personnalisée qui montre que tu connais la marque
-3. Présentation concise de ton profil et de ta valeur ajoutée
-4. Proposition de collaboration claire (partenariat, code promo, ambassadeur...)
-5. Call-to-action simple et direct
-6. Signature professionnelle
-7. Ton : chaleureux, professionnel, enthousiaste — pas générique
+**Règles strictes :**
+1. Objet court et accrocheur (max 50 caractères)
+2. Ton chaleureux, humain, direct — jamais corporate
+3. Le compliment doit sembler sincère et spécifique à cette marque
+4. Proposition claire en une seule phrase
+5. Pas de blabla inutile — court et percutant
+6. Terminer par le prénom uniquement ({self.config.your_name.split()[0]})
 
 Réponds UNIQUEMENT en JSON avec ce format exact :
 {{
