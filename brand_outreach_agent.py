@@ -9,6 +9,7 @@ import json
 import smtplib
 import time
 import requests
+import pandas as pd
 import google.generativeai as genai
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -49,6 +50,29 @@ class Brand:
     website: str = ""
     description: str = ""
     instagram: str = ""
+
+
+# ─── Lecteur Excel ───────────────────────────────────────────────────────────
+
+def load_brands_from_excel(filepath: str) -> list:
+    """Charge une liste de marques depuis un fichier Excel (.xlsx)."""
+    df = pd.read_excel(filepath, engine="openpyxl")
+    df.columns = [c.strip().lower() for c in df.columns]
+    brands = []
+    for _, row in df.iterrows():
+        email = str(row.get("email", "")).strip()
+        name = str(row.get("nom", row.get("name", ""))).strip()
+        if not email or not name:
+            continue
+        brands.append(Brand(
+            name=name,
+            email=email,
+            website=str(row.get("website", "")).strip(),
+            description=str(row.get("description", "")).strip(),
+            instagram=str(row.get("instagram", "")).strip(),
+        ))
+    print(f"[Excel] {len(brands)} marque(s) chargée(s) depuis {filepath}")
+    return brands
 
 
 # ─── Google Places Finder ────────────────────────────────────────────────────
@@ -266,19 +290,20 @@ def main():
     config = Config()
     agent = BrandOutreachAgent(config)
 
-    # ── Option 1 : Recherche automatique via Google Places ──────────────────
-    # Décommente et modifie la recherche selon ta niche
-    # Exemples : "boutique streetwear Paris", "label house music France",
-    #            "marque skincare naturelle", "boutique lifestyle Lyon"
+    # ── Option 1 : Fichier Excel (priorité) ─────────────────────────────────
+    EXCEL_FILE = "marques.xlsx"
 
-    USE_PLACES = bool(config.google_places_api_key)
+    if os.path.exists(EXCEL_FILE):
+        brands = load_brands_from_excel(EXCEL_FILE)
 
-    if USE_PLACES:
+    # ── Option 2 : Google Places API ────────────────────────────────────────
+    elif config.google_places_api_key:
         finder = PlacesFinder(config.google_places_api_key)
         print("[Places] Recherche automatique de boutiques...")
         brands = finder.search("boutique lifestyle mode Paris", max_results=10)
+
+    # ── Option 3 : Liste manuelle (fallback) ─────────────────────────────────
     else:
-        # ── Option 2 : Liste manuelle ────────────────────────────────────────
         brands = [
             Brand(
                 name="Sézane",
@@ -304,7 +329,7 @@ def main():
         ]
 
     if not brands:
-        print("[INFO] Aucune marque trouvée. Vérifie ta clé API ou ta liste manuelle.")
+        print("[INFO] Aucune marque trouvée. Ajoute un fichier marques.xlsx ou configure ta clé Places.")
         return
 
     # dry_run=True = simulation (affiche sans envoyer)
